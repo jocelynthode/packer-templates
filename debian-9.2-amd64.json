@@ -1,24 +1,26 @@
 {
   "variables": {
-    "compression_level": "6",
     "cpus": "1",
     "disk_size": "8192",
     "headless": "false",
-    "iso_checksum": "ec78bc48b48d676775b60eda41528ec33c151c2ce7414a12b13d9b73d34de544",
-    "iso_checksum_type": "sha256",
+    "iso_checksum":
+      "8775231d6f56a3d8f116eb64fe048f5cbd2ea0f8c092a1cb7608bcb4106f9c85cb69ce68f53bd381019ab40f1c0316843036daf3fd9107c81c58a240334cc747",
+    "iso_checksum_type": "sha512",
     "memory": "512",
-    "mirror": "http://cdimage.debian.org/debian-cd/",
+    "mirror": "http://cdimage.debian.org/debian-cd",
+    "version": "9.3.0",
     "ssh_timeout": "60m"
   },
   "builders": [
     {
       "type": "virtualbox-iso",
+      "guest_additions_mode": "disable",
       "guest_os_type": "Debian_64",
-      "iso_url": "{{user `mirror`}}/9.2.1/amd64/iso-cd/debian-9.2.1-amd64-netinst.iso",
+      "iso_url": "{{user `mirror`}}/{{user `version`}}/amd64/iso-cd/debian-{{user `version`}}-amd64-netinst.iso",
       "iso_checksum": "{{user `iso_checksum`}}",
       "iso_checksum_type": "{{user `iso_checksum_type`}}",
-      "output_directory": "output-debian-9.2-amd64-{{build_type}}",
-      "vm_name": "packer-debian-9.2-amd64",
+      "output_directory": "output-debian-{{user `version`}}-amd64-{{build_type}}",
+      "vm_name": "packer-debian-{{user `version`}}-amd64",
       "disk_size": "{{user `disk_size`}}",
       "headless": "{{user `headless`}}",
       "http_directory": "http",
@@ -31,23 +33,58 @@
         "<enter>"
       ],
       "ssh_timeout": "{{user `ssh_timeout`}}",
-      "ssh_username": "vagrant",
-      "ssh_password": "vagrant",
-      "shutdown_command": "sudo systemctl poweroff",
+      "ssh_username": "root",
+      "ssh_password": "abcd1234",
+      "shutdown_command": "systemctl poweroff",
       "vboxmanage": [
         ["modifyvm", "{{.Name}}", "--memory", "{{user `memory`}}"],
         ["modifyvm", "{{.Name}}", "--cpus", "{{user `cpus`}}"]
       ],
       "format": "ova"
-  }
-  ],
-  "post-processors": [
+    },
     {
-      "type": "amazon-import",
-      "region": "eu-west-1",
-      "s3_bucket_name": "test-jte",
-      "license_type": "BYOL",
-      "tags": { "Description": "packer amazon import " }
+      "type": "vmware-iso",
+      "guest_os_type": "debian8-64",
+      "iso_url": "{{user `mirror`}}/{{user `version`}}/amd64/iso-cd/debian-{{user `version`}}-amd64-netinst.iso",
+      "iso_checksum": "{{user `iso_checksum`}}",
+      "iso_checksum_type": "{{user `iso_checksum_type`}}",
+      "output_directory": "output-debian-{{user `version`}}-amd64-{{build_type}}",
+      "vm_name": "packer-debian-{{user `version`}}-amd64",
+      "disk_size": "{{user `disk_size`}}",
+      "headless": "{{user `headless`}}",
+      "http_directory": "http",
+      "boot_wait": "5s",
+      "boot_command": [
+        "<esc><wait>",
+        "auto ",
+        "net.ifnames=0 ",
+        "preseed/url=http://{{.HTTPIP}}:{{.HTTPPort}}/debian-9.2/preseed.cfg ",
+        "<enter>"
+      ],
+      "ssh_timeout": "{{user `ssh_timeout`}}",
+      "ssh_username": "root",
+      "ssh_password": "abcd1234",
+      "shutdown_command": "systemctl poweroff",
+      "vmx_data": {
+        "memsize": "{{user `memory`}}",
+        "numvcpus": "{{user `cpus`}}"
+      }
     }
-  ]
+  ],
+  "post-processors" : [
+    [
+      {
+        "type": "shell-local",
+        "inline": [ "/usr/bin/ovftool output-debian-{{user `version`}}-amd64-{{build_type}}/packer-debian-{{user `version`}}-amd64.vmx output-debian-{{user `version`}}-amd64-{{build_type}}/packer-debian-{{user `version`}}-amd64.ova" ],
+        "only": ["vmware-iso"]
+      },
+      {
+        "type": "artifice",
+        "files": [
+          "output-debian-{{user `version`}}-amd64-{{build_type}}/packer-debian-{{user `version`}}-amd64.ova"
+        ],
+        "only": ["vmware-iso"]
+      }
+   ]
+ ]
 }
